@@ -1,20 +1,33 @@
 from core.database import supabase
 
 
+def normalize_person_name(person):
+    cleaned = " ".join(str(person or "").strip().split())
+
+    if not cleaned:
+        return ""
+
+    return cleaned.title()
+
+
 # ==========================================
 # ADD
 # ==========================================
 
 def add_money(person, amount, note=""):
 
-    supabase.table("money").insert({
+    normalized_person = normalize_person_name(person)
 
-        "person": person,
+    response = supabase.table("money").insert({
+
+        "person": normalized_person,
         "amount": amount,
-        "note": note,
+        "note": note.strip(),
         "status": "Pending"
 
     }).execute()
+
+    return response.data
 
 
 # ==========================================
@@ -23,13 +36,23 @@ def add_money(person, amount, note=""):
 
 def clear_money(person):
 
+    normalized_person = normalize_person_name(person)
+
+    pending = get_person_pending(normalized_person)
+
+    if len(pending) == 0:
+        return 0
+
     supabase.table("money") \
         .update({
-            "status": "Paid"
+            "status": "Paid",
+            "person": normalized_person
         }) \
-        .eq("person", person) \
+        .ilike("person", normalized_person) \
         .eq("status", "Pending") \
         .execute()
+
+    return len(pending)
 
 
 # ==========================================
@@ -50,17 +73,36 @@ def get_pending():
     return response.data
 
 
+def get_person_pending(person):
+
+    normalized_person = normalize_person_name(person)
+
+    response = (
+        supabase
+        .table("money")
+        .select("*")
+        .ilike("person", normalized_person)
+        .eq("status", "Pending")
+        .order("created_at")
+        .execute()
+    )
+
+    return response.data
+
+
 # ==========================================
 # PERSON
 # ==========================================
 
 def get_person(person):
 
+    normalized_person = normalize_person_name(person)
+
     response = (
         supabase
         .table("money")
         .select("*")
-        .eq("person", person)
+        .ilike("person", normalized_person)
         .order("created_at")
         .execute()
     )
@@ -97,7 +139,7 @@ def get_summary():
 
     for item in pending:
 
-        person = item["person"]
+        person = normalize_person_name(item["person"])
 
         amount = int(item["amount"])
 

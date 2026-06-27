@@ -4,161 +4,207 @@ from modules.money import (
     get_pending,
     get_person,
     get_summary,
+    normalize_person_name,
 )
+
+
+ADD_EXAMPLE = "Example:\n\nmoney add Fatima | 2500 | Reel Edit"
+
+
+def format_amount(amount):
+    return f"Tk {int(amount)}"
 
 
 def money_command(message):
 
     lower = message.strip().lower()
 
-    if not lower.startswith("money"):
+    if lower != "money" and not lower.startswith("money "):
         return None
 
     command = message[5:].strip()
+    command_lower = command.lower()
 
-    # ==========================================
-    # MONEY
-    # ==========================================
+    try:
 
-    if command == "":
+        # ==========================================
+        # MONEY
+        # ==========================================
 
-        summary = get_summary()
+        if command == "":
 
-        response = "💰 Money Dashboard\n\n"
+            summary = get_summary()
 
-        response += f"Pending: ৳{summary['total']}\n\n"
+            response = "Money Dashboard\n\n"
 
-        if len(summary["people"]) == 0:
+            response += f"Pending: {format_amount(summary['total'])}\n\n"
 
-            response += "Nobody owes you money."
+            if len(summary["people"]) == 0:
 
-        else:
+                response += "Nobody owes you money."
 
-            response += "People:\n"
+            else:
 
-            for person, amount in summary["people"].items():
+                response += "People:\n"
 
-                response += f"• {person} - ৳{amount}\n"
+                for person, amount in summary["people"].items():
 
-        return response
+                    response += f"- {person} - {format_amount(amount)}\n"
 
-    # ==========================================
-    # MONEY ADD
-    # ==========================================
+            return response
 
-    if command.startswith("add"):
+        # ==========================================
+        # MONEY ADD
+        # ==========================================
 
-        try:
+        if command_lower.startswith("add"):
 
             data = command[3:].strip()
 
-            person, amount, note = [
+            parts = [
                 x.strip()
                 for x in data.split("|")
             ]
 
+            if len(parts) != 3:
+                return ADD_EXAMPLE
+
+            person, amount_text, note = parts
+
+            person = normalize_person_name(person)
+
+            if not person:
+                return "Who owes you money?\n\n" + ADD_EXAMPLE
+
+            try:
+                amount = int(amount_text)
+            except ValueError:
+                return "Amount must be a whole number.\n\n" + ADD_EXAMPLE
+
+            if amount <= 0:
+                return "Amount must be greater than 0.\n\n" + ADD_EXAMPLE
+
             add_money(
                 person,
-                int(amount),
+                amount,
                 note
             )
 
             return (
-                "💰 Added Successfully\n\n"
-                f"{person} owes you ৳{amount}"
+                "Money added.\n\n"
+                f"{person} owes you {format_amount(amount)}."
             )
 
-        except:
+        # ==========================================
+        # MONEY PENDING
+        # ==========================================
 
-            return (
-                "Example:\n\n"
-                "money add Fatima | 2500 | Reel Edit"
-            )
+        if command_lower == "pending":
 
-    # ==========================================
-    # MONEY PENDING
-    # ==========================================
+            pending = get_pending()
 
-    if command == "pending":
+            if len(pending) == 0:
+                return "Nobody owes you money."
 
-        pending = get_pending()
+            response = "Pending Money\n\n"
 
-        if len(pending) == 0:
-            return "Nobody owes you money."
+            total = 0
 
-        response = "💰 Pending Money\n\n"
+            for item in pending:
 
-        total = 0
+                person = normalize_person_name(item["person"])
+                amount = int(item["amount"])
+                note = item.get("note")
 
-        for item in pending:
+                total += amount
+
+                response += (
+                    f"- {person} - "
+                    f"{format_amount(amount)}"
+                )
+
+                if note:
+                    response += f" ({note})"
+
+                response += "\n"
+
+            response += f"\nTotal: {format_amount(total)}"
+
+            return response
+
+        # ==========================================
+        # MONEY CLEAR
+        # ==========================================
+
+        if command_lower.startswith("clear"):
+
+            person = normalize_person_name(command[5:].strip())
+
+            if not person:
+                return "Who should I clear?\n\nExample:\n\nmoney clear Fatima"
+
+            cleared = clear_money(person)
+
+            if cleared == 0:
+                return f"No pending money found for {person}."
+
+            entry_word = "entry" if cleared == 1 else "entries"
+
+            return f"Cleared {cleared} pending money {entry_word} for {person}."
+
+        # ==========================================
+        # MONEY PERSON
+        # ==========================================
+
+        person = normalize_person_name(command)
+
+        if not person:
+            return "Try: money, money pending, or money add Fatima | 2500 | Reel Edit"
+
+        history = get_person(person)
+
+        if len(history) == 0:
+
+            return f"Nothing found for {person}."
+
+        response = f"{person}\n\n"
+
+        earned = 0
+        pending = 0
+
+        for item in history:
 
             amount = int(item["amount"])
+            status = item["status"]
+            note = item.get("note")
 
-            total += amount
+            earned += amount
+
+            if status.lower() == "pending":
+                pending += amount
 
             response += (
-                f"• {item['person']} - "
-                f"৳{amount}"
+                f"- {format_amount(amount)} "
+                f"[{status}]"
             )
 
-            if item["note"]:
-                response += f" ({item['note']})"
+            if note:
+                response += f" - {note}"
 
             response += "\n"
 
-        response += f"\nTotal: ৳{total}"
+        response += (
+            f"\nTotal: {format_amount(earned)}"
+            f"\nPending: {format_amount(pending)}"
+        )
 
         return response
 
-    # ==========================================
-    # MONEY CLEAR
-    # ==========================================
+    except Exception as e:
 
-    if command.startswith("clear"):
+        print("\n========== MONEY ERROR ==========")
+        print(type(e).__name__)
+        print(e)
+        print("=================================\n")
 
-        person = command[5:].strip()
-
-        clear_money(person)
-
-        return f"✅ Cleared pending money for {person}."
-
-    # ==========================================
-    # MONEY PERSON
-    # ==========================================
-
-    history = get_person(command)
-
-    if len(history) == 0:
-
-        return "Nothing found."
-
-    response = f"👤 {command}\n\n"
-
-    earned = 0
-    pending = 0
-
-    for item in history:
-
-        amount = int(item["amount"])
-
-        earned += amount
-
-        if item["status"] == "Pending":
-            pending += amount
-
-        response += (
-            f"• ৳{amount} "
-            f"[{item['status']}]"
-        )
-
-        if item["note"]:
-            response += f" - {item['note']}"
-
-        response += "\n"
-
-    response += (
-        f"\nTotal: ৳{earned}"
-        f"\nPending: ৳{pending}"
-    )
-
-    return response
+        return "Something went wrong with Money. Please try again."
