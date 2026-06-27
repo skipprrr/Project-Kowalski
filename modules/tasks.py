@@ -22,6 +22,7 @@ def get_tasks():
         .table("tasks")
         .select("*")
         .eq("status", "active")
+        .order("id")
         .execute()
     )
 

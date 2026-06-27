@@ -31,6 +31,7 @@ def get_reminders():
             "status",
             "pending"
         )
+        .order("id")
         .execute()
     )
 

@@ -1,3 +1,5 @@
+import traceback
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -41,8 +43,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
 
         print("\n========== ERROR ==========")
-        print(type(e).__name__)
-        print(e)
+        traceback.print_exc()
         print("===========================\n")
 
         await update.message.reply_text(
