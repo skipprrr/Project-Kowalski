@@ -1,0 +1,27 @@
+# Environment
+.env
+
+# Virtual Environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+
+# Temporary
+*.tmp
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Generated helper files
+files.txt
+structure.txt
